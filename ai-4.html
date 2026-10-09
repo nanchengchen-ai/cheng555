@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>綠能特攻隊 EcoJunior | 訪客快速體驗版</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            app: {
+              bg: '#080C15',
+              surface: '#0F172A',
+              card: '#162238',
+              cardLight: '#1E2D48',
+              border: '#273855',
+              neon: '#00F5A0',
+              cyan: '#00D8F6',
+              yellow: '#FBBF24',
+              pink: '#F43F5E',
+              purple: '#A855F7'
+            }
+          },
+          fontFamily: {
+            sans: ['"Noto Sans TC"', 'Inter', 'system-ui', 'sans-serif'],
+          },
+          animation: {
+            'scan': 'scanLoop 1.8s ease-in-out infinite alternate',
+            'spin-slow': 'spin 5s linear infinite',
+            'spin-fast': 'spin 0.6s linear infinite',
+            'pulse-glow': 'pulseGlow 2s ease-in-out infinite'
+          },
+          keyframes: {
+            scanLoop: {
+              '0%': { top: '8%', opacity: '0.95' },
+              '100%': { top: '88%', opacity: '0.95' }
+            },
+            pulseGlow: {
+              '0%, 100%': { opacity: '0.9', transform: 'scale(1)' },
+              '50%': { opacity: '0.6', transform: 'scale(1.02)' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .swipe-track {
+      background: linear-gradient(90deg, rgba(244,63,94,0.18) 0%, rgba(244,63,94,0.45) 100%);
+    }
+    .flash-anim {
+      animation: flashEffect 0.35s ease-out forwards;
+    }
+    @keyframes flashEffect {
+      0% { opacity: 0.95; }
+      100% { opacity: 0; }
+    }
+    .monster-scroll-snap {
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .monster-card {
+      scroll-snap-align: center;
+    }
+  </style>
+</head>
+
+<body class="bg-app-bg text-slate-100 min-h-screen flex justify-center selection:bg-app-neon selection:text-slate-950 font-sans">
+
+  <!-- 全螢幕彩帶爆破 Canvas -->
+  <canvas id="confettiCanvas" class="fixed inset-0 pointer-events-none z-50 w-full h-full"></canvas>
+
+  <!-- 拍照快門閃光 -->
+  <div id="flashOverlay" class="fixed inset-0 bg-white pointer-events-none z-50 opacity-0 transition-opacity"></div>
+
+  <!-- 手機外殼容器 (最大寬度 440px 滿版居中) -->
+  <div class="w-full max-w-[440px] min-h-screen bg-app-surface flex flex-col relative border-x border-app-border/40 shadow-2xl overflow-hidden pb-20">
+
+    <!-- 頂部：靈動島與訪客專屬體驗條 -->
+    <header class="sticky top-0 z-40 bg-app-surface/95 backdrop-blur-md px-3 pt-2 pb-2 border-b border-app-border/70 space-y-2">
+      
+      <!-- 靈動島膠囊 -->
+      <div class="w-full bg-black/90 border border-slate-800 rounded-full py-1.5 px-3 flex items-center justify-between shadow-inner">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-app-neon animate-ping"></span>
+          <span class="text-[11px] font-black tracking-wide text-app-neon flex items-center gap-1" id="islandText">
+            體驗示範班 ⚡ 訪客極速連線中
+          </span>
+        </div>
+        <div class="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+          <span class="text-app-cyan">5G 15ms</span>
+          <i data-lucide="wifi" class="w-3 h-3 text-app-neon"></i>
+          <span id="phoneClock" class="text-white font-bold">16:45</span>
+        </div>
+      </div>
+
+      <!-- 🌟 訪客身分體驗專屬橫幅 (已自動免密登入) -->
+      <div class="bg-gradient-to-r from-emerald-950/70 via-slate-900 to-slate-900 border border-emerald-500/50 rounded-2xl p-2.5 flex items-center justify-between shadow-md">
+        <div class="flex items-center gap-2.5 cursor-pointer" onclick="openAuthModal()">
+          <div class="relative">
+            <div id="userAvatarBox" class="w-9 h-9 rounded-xl bg-gradient-to-tr from-app-neon to-app-cyan flex items-center justify-center text-slate-950 font-black text-lg shadow-md">
+              🌟
+            </div>
+            <span class="absolute -bottom-1 -right-1 w-3 h-3 bg-app-neon rounded-full border-2 border-slate-900"></span>
+          </div>
+
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span id="headerUserName" class="text-xs font-black text-white">節能實習生 (訪客隊長)</span>
+              <span class="text-[9px] bg-emerald-500/20 text-app-neon border border-emerald-500/40 px-1.5 py-0.2 rounded-full font-bold">訪客體驗模式中</span>
+            </div>
+            <div class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+              <span class="text-app-yellow font-bold" id="headerBobaMini">🥤 520杯</span>
+              <span>·</span>
+              <span class="text-cyan-400 font-bold" id="headerXpMini">850 XP</span>
+              <span>·</span>
+              <span class="text-emerald-400">免密全功能解鎖</span>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="openAuthModal()" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-bold border border-slate-700 flex items-center gap-1 active:scale-95 transition">
+          <i data-lucide="user-cog" class="w-3 h-3 text-app-yellow"></i>
+          <span>切換帳號</span>
+        </button>
+      </div>
+
+      <!-- 突發偷跑電推播警報 (可按測警報彈出) -->
+      <div id="schoolAlertBanner" class="absolute top-28 inset-x-3 bg-gradient-to-r from-red-950/95 to-slate-900/95 border-2 border-app-pink rounded-2xl p-3 shadow-2xl z-50 transform -translate-y-64 transition-all duration-500 backdrop-blur-md">
+        <div class="flex items-start gap-2.5">
+          <div class="p-2 bg-app-pink/20 text-app-pink rounded-xl shrink-0 mt-0.5 animate-bounce">
+            <i data-lucide="bell-ring" class="w-5 h-5"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-black text-rose-300">🚨 學務處廣播：抓到放學偷跑電！</span>
+              <span class="text-[10px] text-slate-400">剛剛</span>
+            </div>
+            <p class="text-[11px] text-slate-200 mt-1 leading-snug">
+              值日生已回家，但 <b class="text-app-yellow">教室後排大冷氣</b> 仍忘記關（耗電 3.6 kW）！
+            </p>
+            <div class="flex gap-2 mt-2.5">
+              <button onclick="emergencyRemoteShutdown()" class="px-3 py-1.5 bg-app-pink hover:bg-rose-600 text-white text-xs font-black rounded-xl active:scale-95 transition shadow-lg">
+                遠端一秒全斷
+              </button>
+              <button onclick="dismissSchoolAlert()" class="px-2.5 py-1.5 bg-slate-800 text-slate-300 text-[11px] rounded-xl hover:bg-slate-700">
+                稍後查看
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </header>
+
+    <!-- 主體內容分頁切換區 -->
+    <main class="flex-1 overflow-y-auto no-scrollbar p-3.5 space-y-4">
+
+      
+<section id="videoStudio" class="bg-app-card border border-app-border rounded-3xl p-3.5 space-y-3" aria-label="影片與即時錄影">
+<h2 class="text-sm font-black text-white">📹 影片與即時錄影</h2>
+<p class="text-xs text-slate-400">開啟網頁即可看到已選擇的影片。錄影與選擇的影片只儲存在這台裝置，不會自動公開給其他訪客。</p>
+<video id="featuredVideo" controls playsinline preload="metadata" class="w-full rounded-2xl bg-black" style="max-height:280px" hidden></video>
+<p id="videoEmpty" class="text-xs text-slate-300">尚未設定影片，請選擇影片或錄製一段。若要讓所有掃碼訪客看到同一支影片，需將影片與網頁一同上線。</p>
+<label class="block text-xs text-white">選擇要顯示的影片 <input id="videoFile" type="file" accept="video/*" class="block w-full mt-2"></label>
+<video id="liveVideo" autoplay muted playsinline class="w-full rounded-2xl bg-black" style="max-height:280px" hidden></video>
+<label class="block text-xs text-slate-300"><input id="recordAudio" type="checkbox" checked> 錄製麥克風聲音</label>
+<div class="flex flex-wrap gap-2 text-xs">
+<button id="openLive" type="button" class="px-3 py-2 rounded-xl bg-emerald-600 text-white">開啟鏡頭</button>
+<button id="switchLive" type="button" disabled class="px-3 py-2 rounded-xl bg-slate-700 text-white">切換前／後鏡頭</button>
+<button id="startRecord" type="button" disabled class="px-3 py-2 rounded-xl bg-red-600 text-white">開始錄影</button>
+<button id="stopRecord" type="button" disabled class="px-3 py-2 rounded-xl bg-slate-700 text-white">停止錄影</button>
+<button id="closeLive" type="button" disabled class="px-3 py-2 rounded-xl bg-slate-700 text-white">關閉鏡頭</button>
+<a id="downloadVideo" hidden class="px-3 py-2 rounded-xl bg-cyan-700 text-white">下載影片</a>
+<button id="clearVideo" type="button" class="px-3 py-2 rounded-xl bg-slate-700 text-white">移除影片</button>
+</div>
+<p id="recordStatus" role="status" aria-live="polite" class="text-xs text-slate-300">等待操作。開啟鏡頭需要 HTTPS 與相機權限。</p>
+</section>
+
+<!-- ================= TAB 1: 戰情首頁 ================= -->
+      <div id="tab-dashboard" class="tab-view space-y-4">
+
+        <!-- 國中生趣味戰績換算卡牌 (4 大指標) -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <!-- 珍奶 -->
+          <div class="bg-app-card border border-app-yellow/40 p-3 rounded-2xl flex flex-col justify-between shadow-md">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-bold">
+              <span>🥤 大杯珍奶</span>
+              <span class="text-[9px] bg-yellow-500/10 text-app-yellow px-1.5 py-0.2 rounded font-bold">賺到</span>
+            </div>
+            <div class="my-1.5">
+              <span class="text-2xl font-black font-mono text-app-yellow" id="statBobaCups">520</span>
+              <span class="text-xs text-slate-300"> 杯</span>
+            </div>
+            <div class="text-[10px] text-slate-400 border-t border-slate-800/80 pt-1">
+              相當省下 <b class="text-white font-mono" id="statSavedMoney">NT$ 26,000</b>
+            </div>
+          </div>
+
+          <!-- Switch 遊戲機 -->
+          <div class="bg-app-card border border-app-cyan/40 p-3 rounded-2xl flex flex-col justify-between shadow-md">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-bold">
+              <span>🎮 Switch 遊戲機</span>
+              <span class="text-[9px] bg-cyan-500/10 text-app-cyan px-1.5 py-0.2 rounded font-bold">爽玩</span>
+            </div>
+            <div class="my-1.5">
+              <span class="text-2xl font-black font-mono text-app-cyan" id="statSwitchCount">2</span>
+              <span class="text-xs text-slate-300"> 台 OLED</span>
+            </div>
+            <div class="text-[10px] text-slate-400 border-t border-slate-800/80 pt-1">
+              放學全班打馬力歐
+            </div>
+          </div>
+
+          <!-- 操場大樹 -->
+          <div class="bg-app-card border border-app-neon/40 p-3 rounded-2xl flex flex-col justify-between shadow-md">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-bold">
+              <span>🌲 操場大樹</span>
+              <span class="text-[9px] bg-emerald-500/10 text-app-neon px-1.5 py-0.2 rounded font-bold">減碳</span>
+            </div>
+            <div class="my-1.5">
+              <span class="text-2xl font-black font-mono text-app-neon" id="statTreeCount">180</span>
+              <span class="text-xs text-slate-300"> 棵</span>
+            </div>
+            <div class="text-[10px] text-slate-400 border-t border-slate-800/80 pt-1">
+              減碳 <b class="text-white font-mono">1,250 kg CO2</b>
+            </div>
+          </div>
+
+          <!-- 經驗值戰鬥力 -->
+          <div class="bg-app-card border border-app-purple/40 p-3 rounded-2xl flex flex-col justify-between shadow-md">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-bold">
+              <span>⚡ 特攻隊等級</span>
+              <span class="text-[9px] bg-purple-500/10 text-app-purple px-1.5 py-0.2 rounded font-bold">Lv.5</span>
+            </div>
+            <div class="my-1.5">
+              <span class="text-2xl font-black font-mono text-purple-400" id="statXpCount">850</span>
+              <span class="text-xs text-slate-300"> XP</span>
+            </div>
+            <div class="text-[10px] text-slate-400 border-t border-slate-800/80 pt-1">
+              距升級隊長還差 <b class="text-white font-mono">150 XP</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- 🎚️ 觸控滑動：冷氣溫控風扇變速連動艙 -->
+        <div class="bg-app-card border border-app-border rounded-3xl p-4 space-y-4 shadow-xl">
+          <div class="flex justify-between items-center pb-2 border-b border-app-border/80">
+            <div class="flex items-center gap-2">
+              <i data-lucide="sliders" class="w-4 h-4 text-app-neon"></i>
+              <h3 class="text-xs font-black text-white">教室冷氣與風扇連動艙</h3>
+            </div>
+            <button onclick="triggerSimulatedAlert()" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-app-yellow border border-app-yellow/40 px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1 active:scale-95 transition">
+              <i data-lucide="bell" class="w-3 h-3 text-app-yellow"></i> 測偷電警報
+            </button>
+          </div>
+
+          <!-- 旋轉風扇與溫度即時反映 -->
+          <div class="space-y-2 bg-app-surface p-3.5 rounded-2xl border border-slate-800 relative overflow-hidden">
+            <div class="flex justify-between items-center">
+              <div class="flex items-center gap-3">
+                <div class="relative w-10 h-10 rounded-xl bg-cyan-950/80 border border-cyan-800 flex items-center justify-center text-app-cyan">
+                  <i data-lucide="fan" id="fanIcon" class="w-6 h-6 animate-spin-slow"></i>
+                  <span class="absolute -top-1 -right-1 flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                  </span>
+                </div>
+                <div>
+                  <span class="text-xs font-bold text-white block">變頻大冷氣風速</span>
+                  <span id="fanSpeedStatus" class="text-[10px] text-app-neon font-bold">26°C 恆溫柔風運轉中</span>
+                </div>
+              </div>
+
+              <div class="text-right">
+                <span id="labelAcTemp" class="text-base font-black font-mono text-app-cyan">26.0°C</span>
+                <span class="text-[10px] text-app-neon font-bold block" id="labelBobaBonus">+15 杯珍奶 🥤</span>
+              </div>
+            </div>
+
+            <!-- 觸控滑桿 -->
+            <input type="range" id="sliderAcTemp" min="18" max="28" step="0.5" value="26" 
+                   class="w-full h-2.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-app-cyan">
+            
+            <div class="flex justify-between text-[9px] text-slate-400 font-bold px-0.5">
+              <span class="text-rose-400">18°C (風扇超轉狂吃電)</span>
+              <span class="text-app-neon font-bold">26°C (黃金舒適節能)</span>
+              <span class="text-amber-400">28°C (微風極省)</span>
+            </div>
+          </div>
+
+          <!-- 3 大情境快速切換 -->
+          <div>
+            <span class="text-[11px] font-bold text-slate-400 mb-1.5 block">⚡ 教室情境一秒套用</span>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="setRemotePreset('class')" class="p-2 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-xl flex flex-col items-center gap-1 transition">
+                <span class="text-base">📖</span>
+                <span class="text-[11px] font-bold text-white">上課模式</span>
+                <span class="text-[9px] text-slate-400">26°C / 柔光</span>
+              </button>
+              <button onclick="setRemotePreset('nap')" class="p-2 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-xl flex flex-col items-center gap-1 transition">
+                <span class="text-base">💤</span>
+                <span class="text-[11px] font-bold text-white">午休模式</span>
+                <span class="text-[9px] text-slate-400">熄燈 / 微風</span>
+              </button>
+              <button onclick="setRemotePreset('dismiss')" class="p-2 bg-rose-950/40 hover:bg-rose-900/50 active:scale-95 border border-rose-800/80 rounded-xl flex flex-col items-center gap-1 transition">
+                <span class="text-base">🏃</span>
+                <span class="text-[11px] font-bold text-rose-300">放學全斷</span>
+                <span class="text-[9px] text-rose-400">除冰箱全切</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 滑動解鎖：【滑動一鍵放學大斷電】 -->
+          <div class="pt-1">
+            <div class="text-[11px] font-black text-rose-300 mb-1 flex items-center justify-between">
+              <span class="flex items-center gap-1">
+                <i data-lucide="flame" class="w-3.5 h-3.5 text-app-pink"></i>
+                放學緊急大絕招
+              </span>
+              <span class="text-[10px] text-slate-400">向右滑到底立即斷電</span>
+            </div>
+
+            <div id="swipeTrack" class="swipe-track h-12 w-full rounded-2xl border border-rose-500/50 relative overflow-hidden flex items-center px-1.5 select-none touch-none">
+              <div class="absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-black text-rose-200/80 tracking-wider">
+                <span id="swipeGuideText">👉 滑動一鍵放學大斷電 ⚡</span>
+              </div>
+
+              <div id="swipeKnob" class="w-10 h-10 rounded-xl bg-app-pink text-white flex items-center justify-center font-bold shadow-lg cursor-grab active:cursor-grabbing z-10 transition-transform duration-75">
+                <i data-lucide="power" class="w-5 h-5"></i>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 👾 吃電怪獸卡牌（支援手機水平左右滑動切換） -->
+        <div class="space-y-2">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="ghost" class="w-4 h-4 text-purple-400"></i>
+              <h4 class="text-xs font-black text-white">吃電怪獸抓捕圖鑑 (左右滑動)</h4>
+            </div>
+            <span class="text-[10px] text-slate-400">👈 手指滑動封印 👉</span>
+          </div>
+
+          <div class="monster-scroll-snap flex gap-3 overflow-x-auto no-scrollbar py-1">
+            
+            <!-- 怪獸卡 1: 冷氣大魔王 -->
+            <div class="monster-card min-w-[260px] bg-gradient-to-br from-cyan-950/80 to-slate-900 border border-cyan-700/60 p-3.5 rounded-2xl shrink-0 flex flex-col justify-between shadow-lg">
+              <div>
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-black text-cyan-300 flex items-center gap-1">❄️ 冷氣大魔王</span>
+                  <span class="text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded font-bold">高危險</span>
+                </div>
+                <div class="text-[11px] text-slate-300 mt-1 leading-snug">
+                  喜歡趁沒人開 19°C 暴風狂吹，每小時偷吃 2.8 度電！
+                </div>
+              </div>
+              <div class="mt-3 pt-2 border-t border-cyan-800/50 flex items-center justify-between">
+                <span class="text-[10px] text-app-yellow font-bold">封印可得 +12 珍奶</span>
+                <button onclick="sealMonster('ac')" class="px-3 py-1 bg-app-cyan hover:bg-cyan-400 text-slate-950 text-[10px] font-black rounded-lg active:scale-95 transition shadow">
+                  遠端封印 ⚡
+                </button>
+              </div>
+            </div>
+
+            <!-- 怪獸卡 2: 智慧黑板幽靈 -->
+            <div class="monster-card min-w-[260px] bg-gradient-to-br from-purple-950/80 to-slate-900 border border-purple-700/60 p-3.5 rounded-2xl shrink-0 flex flex-col justify-between shadow-lg">
+              <div>
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-black text-purple-300 flex items-center gap-1">💻 大黑板螢幕幽靈</span>
+                  <span class="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-bold">偷跑型</span>
+                </div>
+                <div class="text-[11px] text-slate-300 mt-1 leading-snug">
+                  下課放空 86 吋智慧黑板亮整晚，背光風扇持續狂轉待機！
+                </div>
+              </div>
+              <div class="mt-3 pt-2 border-t border-purple-800/50 flex items-center justify-between">
+                <span class="text-[10px] text-app-yellow font-bold">封印可得 +8 珍奶</span>
+                <button onclick="sealMonster('pc')" class="px-3 py-1 bg-app-purple hover:bg-purple-400 text-white text-[10px] font-black rounded-lg active:scale-95 transition shadow">
+                  強制休眠 💤
+                </button>
+              </div>
+            </div>
+
+            <!-- 怪獸卡 3: 飲水機全夜滾燙怪 -->
+            <div class="monster-card min-w-[260px] bg-gradient-to-br from-amber-950/80 to-slate-900 border border-amber-700/60 p-3.5 rounded-2xl shrink-0 flex flex-col justify-between shadow-lg">
+              <div>
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-black text-amber-300 flex items-center gap-1">♨️ 沸騰長明怪</span>
+                  <span class="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold">夜間偷吃</span>
+                </div>
+                <div class="text-[11px] text-slate-300 mt-1 leading-snug">
+                  半夜走廊沒人卻整晚狂燒熱水保溫，默默耗掉整棟樓 15% 電力！
+                </div>
+              </div>
+              <div class="mt-3 pt-2 border-t border-amber-800/50 flex items-center justify-between">
+                <span class="text-[10px] text-app-yellow font-bold">封印可得 +10 珍奶</span>
+                <button onclick="sealMonster('water')" class="px-3 py-1 bg-app-yellow hover:bg-amber-400 text-slate-950 text-[10px] font-black rounded-lg active:scale-95 transition shadow">
+                  夜間定時 ⏰
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 24 小時用電曲線 (Chart.js) -->
+        <div class="bg-app-card border border-app-border rounded-3xl p-3.5 space-y-2">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="line-chart" class="w-4 h-4 text-app-cyan"></i>
+              <h4 class="text-xs font-black text-white">今日校園用電走勢 (kW)</h4>
+            </div>
+            <span class="text-[10px] font-bold text-app-neon font-mono">AI 削峰運作中</span>
+          </div>
+
+          <div class="h-36 w-full relative">
+            <canvas id="homeLoadChart"></canvas>
+          </div>
+          
+          <div class="flex justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800">
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> 原始浪費</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-app-neon"></span> 訪客遠端節能後</span>
+            <span class="text-rose-400">🚨 契約上限: 250 kW</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= TAB 2: 拍照抓鬼 (AI Camera Modal/View) ================= -->
+      <div id="tab-camera" class="tab-view hidden space-y-4">
+        
+        <div class="bg-app-card border border-app-border rounded-3xl p-3.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="p-1.5 bg-app-neon/20 text-app-neon rounded-xl">
+                <i data-lucide="camera" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-xs font-black text-white">AI 柯南拍照抓電鬼</h3>
+                <p class="text-[10px] text-slate-400">拍下電表或教室設備，AI 抓出誰在偷耗電</p>
+              </div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-app-cyan/20 text-app-cyan font-bold">
+              雷射掃描中
+            </span>
+          </div>
+
+          <!-- 4 個預設場景切換按鈕 -->
+          <div class="grid grid-cols-4 gap-1.5 text-[10px] font-bold">
+            <button onclick="switchPhotoTarget('ac')" id="btnTargetAc" class="p-2 rounded-xl bg-slate-850 border-2 border-app-neon text-white text-center">
+              ❄️ 班級冷氣
+            </button>
+            <button onclick="switchPhotoTarget('meter')" id="btnTargetMeter" class="p-2 rounded-xl bg-slate-850 border border-slate-700 text-slate-300 text-center">
+              📟 智慧電表
+            </button>
+            <button onclick="switchPhotoTarget('pc')" id="btnTargetPc" class="p-2 rounded-xl bg-slate-850 border border-slate-700 text-slate-300 text-center">
+              💻 電腦機房
+            </button>
+            <button onclick="switchPhotoTarget('board')" id="btnTargetBoard" class="p-2 rounded-xl bg-slate-850 border border-slate-700 text-slate-300 text-center">
+              ⚡ 開關總箱
+            </button>
+          </div>
+
+          <!-- 模擬觀景窗 (往復雷射掃描 + Bounding Box) -->
+          <div class="relative w-full h-56 rounded-2xl overflow-hidden bg-black border border-app-border flex items-center justify-center">
+            <img id="cameraPreviewImg" src="https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=700&q=80" 
+                 class="w-full h-full object-cover opacity-85" alt="掃描目標">
+
+            <!-- 雷射光束 -->
+            <div class="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-app-neon to-transparent shadow-[0_0_15px_#00F5A0] animate-scan pointer-events-none"></div>
+
+            <!-- Bounding Box -->
+            <div id="aiBoundingBox1" class="absolute top-10 left-8 border-2 border-dashed border-app-neon bg-emerald-500/20 px-2 py-1 rounded text-[10px] text-app-neon font-bold animate-pulse">
+              🎯 抓到：設定溫度 21°C (極度浪費！)
+            </div>
+            <div id="aiBoundingBox2" class="absolute bottom-12 right-6 border-2 border-dashed border-app-yellow bg-amber-500/20 px-2 py-1 rounded text-[10px] text-app-yellow font-bold">
+              ⚡ 偷跑瓦數: 2,600W
+            </div>
+
+            <!-- 真實手機相機上傳入口 -->
+            <input type="file" id="realCameraInput" accept="image/*" class="hidden">
+            <button onclick="document.getElementById('realCameraInput').click()" class="absolute bottom-2.5 right-2.5 px-2.5 py-1 bg-slate-900/80 text-[10px] font-bold text-white rounded-xl border border-slate-700 flex items-center gap-1">
+              <i data-lucide="camera-retro" class="w-3.5 h-3.5 text-app-neon"></i> 打開手機相機
+            </button>
+          </div>
+
+          <!-- AI 診斷分析筆記 -->
+          <div class="bg-app-surface p-3 rounded-2xl border border-slate-800 space-y-2">
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-black text-white flex items-center gap-1">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-app-neon"></i> AI 柯南破案結論：
+              </span>
+              <span class="text-[10px] text-app-neon font-mono font-bold">準確率 99.8%</span>
+            </div>
+            <p id="cameraDiagnosisText" class="text-[11px] text-slate-300 leading-relaxed">
+              冷氣吹風口紅外感溫顯示設定在 21°C，整間教室冷到發抖！AI 建議用手機遠端一鍵校正至 26°C，馬上多喝 12 杯大杯珍奶！
+            </p>
+            <button onclick="applyPhotoCorrection()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-app-neon to-app-cyan text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg active:scale-95 transition">
+              <i data-lucide="wand-2" class="w-4 h-4"></i>
+              拍照診斷完畢：將照片數據灌入戰情室！
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= TAB 3: 任務打怪 ================= -->
+      <div id="tab-quests" class="tab-view hidden space-y-3.5">
+        
+        <div class="bg-app-card border border-app-border rounded-3xl p-3.5">
+          <div class="flex justify-between items-center mb-3">
+            <div>
+              <h3 class="text-xs font-black text-white flex items-center gap-1.5">
+                <i data-lucide="swords" class="w-4 h-4 text-app-yellow"></i> 每日生活科技節能懸賞
+              </h3>
+              <p class="text-[10px] text-slate-400">完成任務領取 XP 升級神隊友稱號</p>
+            </div>
+            <span class="text-[10px] font-bold text-app-yellow bg-yellow-500/10 px-2 py-0.5 rounded-full">
+              每日刷新
+            </span>
+          </div>
+
+          <div class="space-y-2.5">
+            <!-- 任務 1 -->
+            <div class="p-3 bg-app-surface rounded-2xl border border-slate-800 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="p-2 rounded-xl bg-emerald-500/20 text-app-neon">
+                  <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white">中午午休關燈 40 分鐘</div>
+                  <div class="text-[10px] text-slate-400">已達成 · 獲得 50 XP + 1 杯珍奶</div>
+                </div>
+              </div>
+              <button class="px-2.5 py-1 bg-slate-800 text-slate-500 font-bold text-[10px] rounded-lg cursor-not-allowed">
+                已領取
+              </button>
+            </div>
+
+            <!-- 任務 2 -->
+            <div class="p-3 bg-app-surface rounded-2xl border border-slate-800 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="p-2 rounded-xl bg-cyan-500/20 text-app-cyan">
+                  <i data-lucide="thermometer" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white">將冷氣固定在 26°C 恆溫</div>
+                  <div class="text-[10px] text-slate-400">今日省電達標中 · 獎勵 +80 XP</div>
+                </div>
+              </div>
+              <button onclick="claimQuestReward(80, '冷氣恆溫大師')" class="px-2.5 py-1 bg-app-neon hover:bg-emerald-400 text-slate-950 font-black text-[10px] rounded-lg active:scale-95 transition shadow">
+                領取 XP
+              </button>
+            </div>
+
+            <!-- 任務 3 -->
+            <div class="p-3 bg-app-surface rounded-2xl border border-slate-800 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="p-2 rounded-xl bg-rose-500/20 text-rose-400">
+                  <i data-lucide="power" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white">放學 17:05 前完成全斷電</div>
+                  <div class="text-[10px] text-slate-400">挑戰放學不偷跑 · 獎勵 +150 XP</div>
+                </div>
+              </div>
+              <button onclick="claimQuestReward(150, '放學守護神')" class="px-2.5 py-1 bg-app-cyan hover:bg-cyan-400 text-slate-950 font-black text-[10px] rounded-lg active:scale-95 transition shadow">
+                領取 XP
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 能耗甜甜圈圓餅圖 -->
+        <div class="bg-app-card border border-app-border rounded-3xl p-3.5">
+          <div class="flex justify-between items-center mb-2">
+            <h4 class="text-xs font-black text-white flex items-center gap-1.5">
+              <i data-lucide="pie-chart" class="w-4 h-4 text-app-cyan"></i> 誰是校園吃電怪獸？
+            </h4>
+            <span class="text-[10px] text-slate-400">即時分佈</span>
+          </div>
+          <div class="h-32 w-full flex items-center justify-center">
+            <canvas id="monsterPieChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= TAB 4: 天梯排行榜 ================= -->
+      <div id="tab-leaderboard" class="tab-view hidden space-y-3.5">
+        
+        <div class="bg-app-card border border-app-border rounded-3xl p-3.5">
+          <div class="flex justify-between items-center mb-3">
+            <div>
+              <h3 class="text-xs font-black text-white flex items-center gap-1.5">
+                <i data-lucide="trophy" class="w-4 h-4 text-app-yellow"></i> 全校班級節能天梯榜
+              </h3>
+              <p class="text-[10px] text-slate-400">看哪一班最會幫學校省電賺珍奶</p>
+            </div>
+            <span class="text-[10px] font-bold text-app-neon bg-emerald-500/10 px-2 py-0.5 rounded-full">
+              每週結算
+            </span>
+          </div>
+
+          <div class="space-y-2">
+            <!-- 榜首 -->
+            <div class="p-3 rounded-2xl bg-gradient-to-r from-emerald-950/70 to-slate-900 border-2 border-app-neon flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="text-xl">🥇</div>
+                <div>
+                  <div class="text-xs font-black text-app-neon flex items-center gap-1">
+                    <span id="rank1ClassName">體驗示範班 (訪客隊長)</span>
+                    <span class="text-[9px] bg-app-neon text-slate-950 px-1 rounded font-bold">冠軍</span>
+                  </div>
+                  <div class="text-[10px] text-slate-300">節能率 28.5% · 賺進 520 杯珍奶</div>
+                </div>
+              </div>
+              <button onclick="sendTaunt()" class="px-2.5 py-1 bg-app-neon text-slate-950 text-[10px] font-black rounded-lg active:scale-95 transition">
+                發送讚 👍
+              </button>
+            </div>
+
+            <!-- 第 2 名 -->
+            <div class="p-2.5 rounded-2xl bg-app-surface border border-slate-800 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="text-lg">🥈</div>
+                <div>
+                  <div class="text-xs font-bold text-white">8年1班</div>
+                  <div class="text-[10px] text-slate-400">節能率 24.2% · 賺進 480 杯珍奶</div>
+                </div>
+              </div>
+              <span class="text-[10px] text-slate-400 font-mono">緊追在後</span>
+            </div>
+
+            <!-- 第 3 名 -->
+            <div class="p-2.5 rounded-2xl bg-app-surface border border-slate-800 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="text-lg">🥉</div>
+                <div>
+                  <div class="text-xs font-bold text-white">7年2班</div>
+                  <div class="text-[10px] text-slate-400">節能率 21.0% · 賺進 410 杯珍奶</div>
+                </div>
+              </div>
+              <span class="text-[10px] text-slate-400 font-mono">季軍</span>
+            </div>
+
+            <!-- 偷電警告班級 -->
+            <div class="p-2.5 rounded-2xl bg-rose-950/30 border border-rose-800/60 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="text-lg">⚠️</div>
+                <div>
+                  <div class="text-xs font-bold text-rose-300">9年3班 (電費黑名單)</div>
+                  <div class="text-[10px] text-rose-400">冷氣開 19°C 開窗吹 · 浪費電！</div>
+                </div>
+              </div>
+              <button onclick="sendRemoteWarning()" class="px-2 py-1 bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-bold rounded-lg active:scale-95 transition">
+                廣播警告 📢
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- 底部 Tab 導航列 -->
+    <nav class="absolute bottom-0 inset-x-0 bg-app-surface/95 backdrop-blur-lg border-t border-app-border py-2 px-4 flex justify-around items-center z-40 select-none">
+      <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item flex flex-col items-center gap-0.5 text-app-neon transition">
+        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+        <span class="text-[10px] font-black">戰情</span>
+      </button>
+
+      <button onclick="switchTab('camera')" id="nav-camera" class="nav-item flex flex-col items-center gap-0.5 text-slate-400 hover:text-white transition">
+        <i data-lucide="camera" class="w-5 h-5"></i>
+        <span class="text-[10px] font-bold">拍照抓鬼</span>
+      </button>
+
+      <button onclick="switchTab('quests')" id="nav-quests" class="nav-item flex flex-col items-center gap-0.5 text-slate-400 hover:text-white transition">
+        <i data-lucide="swords" class="w-5 h-5"></i>
+        <span class="text-[10px] font-bold">打怪任務</span>
+      </button>
+
+      <button onclick="switchTab('leaderboard')" id="nav-leaderboard" class="nav-item flex flex-col items-center gap-0.5 text-slate-400 hover:text-white transition">
+        <i data-lucide="trophy" class="w-5 h-5"></i>
+        <span class="text-[10px] font-bold">排行榜</span>
+      </button>
+    </nav>
+
+    <!-- 浮動 Toast 提示 -->
+    <div id="toastBox" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 transform translate-y-32 opacity-0 transition-all duration-300 pointer-events-none w-11/12 max-w-[380px] flex items-center gap-3 px-4 py-3 rounded-2xl bg-app-card border border-app-neon text-white shadow-2xl">
+      <div class="w-8 h-8 rounded-xl bg-app-neon/20 text-app-neon flex items-center justify-center text-sm font-bold shrink-0" id="toastIcon">
+        <i data-lucide="check" class="w-4 h-4"></i>
+      </div>
+      <div class="flex-1">
+        <h4 class="text-xs font-black text-white" id="toastTitle">神操作！</h4>
+        <p class="text-[11px] text-slate-300" id="toastDesc">AI 已經幫你搞定這項設定了</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 帳號切換與認證彈窗 (Auth & Credentials Modal) -->
+  <div id="authModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border-2 border-emerald-500/80 w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl relative flex flex-col p-4 space-y-3.5">
+      
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
+        <div class="flex items-center gap-2">
+          <div class="p-1.5 bg-app-neon/20 text-app-neon rounded-xl">
+            <i data-lucide="user" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-xs font-black text-white">帳號中心與切換</h3>
+            <p class="text-[10px] text-slate-400">目前為：🌟 節能實習生 (訪客模式)</p>
+          </div>
+        </div>
+        <button onclick="closeAuthModal()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- 快速切換身分卡 -->
+      <div class="space-y-2">
+        <!-- 訪客體驗 (當前中) -->
+        <div onclick="loginAs('guest')" class="p-3 rounded-2xl bg-emerald-950/70 border border-app-neon cursor-pointer flex justify-between items-center">
+          <div>
+            <div class="text-xs font-black text-app-neon flex items-center gap-1.5">
+              <span>🌟 訪客體驗帳號 (免密碼)</span>
+              <span class="text-[9px] bg-app-neon text-slate-950 px-1 rounded font-bold">使用中</span>
+            </div>
+            <div class="text-[10px] text-slate-300 mt-0.5">預設已直接登入 · 暢玩全部功能</div>
+          </div>
+          <i data-lucide="check" class="w-4 h-4 text-app-neon"></i>
+        </div>
+
+        <!-- 小明隊長 -->
+        <div onclick="loginAs('student')" class="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 cursor-pointer flex justify-between items-center transition">
+          <div>
+            <div class="text-xs font-bold text-white flex items-center gap-1.5">
+              <span>⚡ 7年5班 節能隊長 (小明)</span>
+            </div>
+            <div class="text-[10px] text-slate-400 font-mono mt-0.5">student@school.edu.tw / eco123456</div>
+          </div>
+          <span class="text-[10px] text-cyan-400 font-bold">切換</span>
+        </div>
+
+        <!-- 總務處管理員 -->
+        <div onclick="loginAs('admin')" class="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 cursor-pointer flex justify-between items-center transition">
+          <div>
+            <div class="text-xs font-bold text-white flex items-center gap-1.5">
+              <span>🏫 全校總務處設備管理員</span>
+            </div>
+            <div class="text-[10px] text-slate-400 font-mono mt-0.5">admin@school.edu.tw / admin888</div>
+          </div>
+          <span class="text-[10px] text-cyan-400 font-bold">切換</span>
+        </div>
+      </div>
+
+      <button onclick="closeAuthModal()" class="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold active:scale-95 transition">
+        返回節能神隊友
+      </button>
+
+    </div>
+  </div>
+
+  <script>
+    // --- 應用程式狀態 (預設已直接以訪客模式登入) ---
+    const appState = {
+      currentUser: {
+        role: 'guest',
+        name: '節能實習生 (訪客隊長)',
+        schoolClass: '體驗示範班',
+        avatar: '🌟'
+      },
+      bobaCups: 520,
+      savedMoney: 26000,
+      switchCount: 2,
+      treeCount: 180,
+      xp: 850,
+      acTemp: 26.0,
+      activeTab: 'dashboard'
+    };
+
+    // --- Web Audio 原生音效合成引擎 ---
+    const AudioEngine = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+      },
+      playTone(freq, type = 'sine', duration = 0.1, gainVal = 0.2) {
+        try {
+          this.init();
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {}
+      },
+      success() {
+        this.playTone(523, 'sine', 0.1, 0.2);
+        setTimeout(() => this.playTone(659, 'sine', 0.1, 0.2), 90);
+        setTimeout(() => this.playTone(784, 'sine', 0.2, 0.2), 180);
+      },
+      alert() {
+        this.playTone(880, 'sawtooth', 0.15, 0.25);
+        setTimeout(() => this.playTone(440, 'sawtooth', 0.2, 0.25), 150);
+      },
+      shutter() {
+        this.playTone(900, 'triangle', 0.05, 0.3);
+        setTimeout(() => this.playTone(250, 'triangle', 0.08, 0.2), 50);
+      },
+      powerDown() {
+        this.playTone(500, 'sawtooth', 0.1, 0.25);
+        setTimeout(() => this.playTone(350, 'sawtooth', 0.15, 0.25), 100);
+        setTimeout(() => this.playTone(150, 'sine', 0.35, 0.3), 220);
+      }
+    };
+
+    // --- 全螢幕 Canvas Confetti 彩帶 ---
+    const confettiCanvas = document.getElementById('confettiCanvas');
+    const confettiCtx = confettiCanvas.getContext('2d');
+    let confettiList = [];
+
+    function resizeConfetti() {
+      confettiCanvas.width = window.innerWidth;
+      confettiCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeConfetti);
+    resizeConfetti();
+
+    function triggerConfetti() {
+      confettiList = [];
+      const colors = ['#00F5A0', '#00D8F6', '#FBBF24', '#F43F5E', '#A855F7', '#FFFFFF'];
+      for (let i = 0; i < 70; i++) {
+        confettiList.push({
+          x: confettiCanvas.width / 2,
+          y: confettiCanvas.height / 2,
+          w: Math.random() * 8 + 4,
+          h: Math.random() * 8 + 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          vx: (Math.random() - 0.5) * 14,
+          vy: (Math.random() - 0.7) * 16,
+          gravity: 0.35,
+          rotation: Math.random() * 360,
+          rotSpeed: (Math.random() - 0.5) * 8,
+          opacity: 1
+        });
+      }
+      requestAnimationFrame(renderConfetti);
+    }
+
+    function renderConfetti() {
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+      let alive = false;
+      confettiList.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += p.gravity;
+        p.rotation += p.rotSpeed;
+        p.opacity -= 0.016;
+        if (p.opacity > 0) {
+          alive = true;
+          confettiCtx.save();
+          confettiCtx.translate(p.x, p.y);
+          confettiCtx.rotate((p.rotation * Math.PI) / 180);
+          confettiCtx.fillStyle = p.color;
+          confettiCtx.globalAlpha = Math.max(0, p.opacity);
+          confettiCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          confettiCtx.restore();
+        }
+      });
+      if (alive) requestAnimationFrame(renderConfetti);
+      else confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    }
+
+    // --- 身分切換邏輯 ---
+    function openAuthModal() {
+      AudioEngine.playTone(600, 'sine', 0.05, 0.1);
+      document.getElementById('authModal').classList.remove('hidden');
+    }
+
+    function closeAuthModal() {
+      document.getElementById('authModal').classList.add('hidden');
+    }
+
+    function loginAs(role) {
+      AudioEngine.success();
+      triggerConfetti();
+
+      if (role === 'guest') {
+        appState.currentUser = {
+          role: 'guest',
+          name: '節能實習生 (訪客隊長)',
+          schoolClass: '體驗示範班',
+          avatar: '🌟'
+        };
+        document.getElementById('userAvatarBox').innerText = '🌟';
+        document.getElementById('headerUserName').innerText = '節能實習生 (訪客隊長)';
+        document.getElementById('islandText').innerText = '體驗示範班 ⚡ 訪客極速連線中';
+        document.getElementById('rank1ClassName').innerText = '體驗示範班 (訪客隊長)';
+        triggerToast('🌟 訪客體驗模式啟用！', '免密碼直接體驗所有遠端節能與打怪功能！');
+      } else if (role === 'student') {
+        appState.currentUser = {
+          role: 'student',
+          name: '小明 (節能隊長)',
+          schoolClass: '7年5班',
+          avatar: '⚡'
+        };
+        document.getElementById('userAvatarBox').innerText = '⚡';
+        document.getElementById('headerUserName').innerText = '小明 (節能隊長)';
+        document.getElementById('islandText').innerText = '7年5班 微電網連線中';
+        document.getElementById('rank1ClassName').innerText = '7年5班 (小明隊長)';
+        triggerToast('⚡ 已切換為 7年5班 小明隊長！', '帳號 student@school.edu.tw 登入中！');
+      } else {
+        appState.currentUser = {
+          role: 'admin',
+          name: '總務處 陳組長',
+          schoolClass: '全校總控',
+          avatar: '🏫'
+        };
+        document.getElementById('userAvatarBox').innerText = '🏫';
+        document.getElementById('headerUserName').innerText = '總務處 陳組長';
+        document.getElementById('islandText').innerText = '全校微電網 主管權限';
+        document.getElementById('rank1ClassName').innerText = '全校微電網總控';
+        triggerToast('🏫 已切換至總務處管理員！', '您已取得全校教室遠端總控權限！');
+      }
+
+      closeAuthModal();
+    }
+
+    // --- Tab 分頁切換 ---
+    function switchTab(tabId) {
+      AudioEngine.playTone(700, 'sine', 0.05, 0.1);
+      appState.activeTab = tabId;
+
+      document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
+      const activeEl = document.getElementById(`tab-${tabId}`);
+      if (activeEl) activeEl.classList.remove('hidden');
+
+      document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.classList.remove('text-app-neon');
+        btn.classList.add('text-slate-400');
+        const span = btn.querySelector('span');
+        if (span) {
+          span.classList.remove('font-black');
+          span.classList.add('font-bold');
+        }
+      });
+
+      const activeBtn = document.getElementById(`nav-${tabId}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-slate-400');
+        activeBtn.classList.add('text-app-neon');
+        const span = activeBtn.querySelector('span');
+        if (span) {
+          span.classList.remove('font-bold');
+          span.classList.add('font-black');
+        }
+      }
+    }
+
+    // --- 冷氣滑桿與風扇動態轉速連動 ---
+    const sliderAcTemp = document.getElementById('sliderAcTemp');
+    const fanIcon = document.getElementById('fanIcon');
+    const fanSpeedStatus = document.getElementById('fanSpeedStatus');
+
+    sliderAcTemp.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      appState.acTemp = val;
+      document.getElementById('labelAcTemp').innerText = `${val.toFixed(1)}°C`;
+      AudioEngine.playTone(300 + val * 20, 'sine', 0.03, 0.08);
+
+      const diff = val - 22;
+      const bobaBonus = Math.max(0, Math.round(diff * 8));
+      const bobaEl = document.getElementById('labelBobaBonus');
+
+      if (val < 22) {
+        fanIcon.className = "w-6 h-6 text-rose-400 animate-spin-fast";
+        fanSpeedStatus.innerText = "18°C 壓縮機暴轉狂耗電！";
+        fanSpeedStatus.className = "text-[10px] text-rose-400 font-bold";
+        bobaEl.innerText = `太冷耗電！浪費珍奶 😭`;
+        bobaEl.className = "text-[10px] text-rose-400 font-bold block";
+      } else if (val <= 26) {
+        fanIcon.className = "w-6 h-6 text-app-cyan animate-spin-slow";
+        fanSpeedStatus.innerText = `${val.toFixed(1)}°C 變頻柔風恆溫中`;
+        fanSpeedStatus.className = "text-[10px] text-app-neon font-bold";
+        bobaEl.innerText = `+${bobaBonus} 杯珍奶 🥤`;
+        bobaEl.className = "text-[10px] text-app-neon font-bold block";
+      } else {
+        fanIcon.className = "w-6 h-6 text-app-yellow animate-spin-slow";
+        fanSpeedStatus.innerText = `${val.toFixed(1)}°C 微風極省電模式`;
+        fanSpeedStatus.className = "text-[10px] text-app-yellow font-bold";
+        bobaEl.innerText = `+${bobaBonus + 8} 杯珍奶 🥤`;
+        bobaEl.className = "text-[10px] text-app-yellow font-bold block";
+      }
+
+      appState.bobaCups = 520 + bobaBonus;
+      document.getElementById('statBobaCups').innerText = appState.bobaCups;
+      document.getElementById('headerBobaMini').innerText = `🥤 ${appState.bobaCups}杯`;
+    });
+
+    // 教室情境切換
+    function setRemotePreset(mode) {
+      AudioEngine.success();
+      if (mode === 'class') {
+        sliderAcTemp.value = 26;
+        sliderAcTemp.dispatchEvent(new Event('input'));
+        triggerToast('📖 上課模式套用', '冷氣 26°C 恆溫運轉，上課神清氣爽！');
+      } else if (mode === 'nap') {
+        sliderAcTemp.value = 27;
+        sliderAcTemp.dispatchEvent(new Event('input'));
+        triggerToast('💤 午休模式套用', '微風模式啟動，全班安靜充電中！');
+      } else if (mode === 'dismiss') {
+        executeSwipePowerOff();
+      }
+    }
+
+    // 滑動解鎖大斷電
+    const swipeTrack = document.getElementById('swipeTrack');
+    const swipeKnob = document.getElementById('swipeKnob');
+    let isDragging = false;
+    let startX = 0;
+    let currentX = 0;
+    let maxSwipeDist = 0;
+
+    function initSwipe() {
+      maxSwipeDist = swipeTrack.clientWidth - swipeKnob.clientWidth - 12;
+    }
+    window.addEventListener('resize', initSwipe);
+    initSwipe();
+
+    function onDragStart(e) {
+      isDragging = true;
+      initSwipe();
+      startX = (e.touches ? e.touches[0].clientX : e.clientX);
+      swipeKnob.style.transition = 'none';
+    }
+
+    function onDragMove(e) {
+      if (!isDragging) return;
+      const clientX = (e.touches ? e.touches[0].clientX : e.clientX);
+      const deltaX = clientX - startX;
+      currentX = Math.max(0, Math.min(deltaX, maxSwipeDist));
+      swipeKnob.style.transform = `translateX(${currentX}px)`;
+
+      if (currentX >= maxSwipeDist * 0.92) {
+        onDragEnd();
+        executeSwipePowerOff();
+      }
+    }
+
+    function onDragEnd() {
+      if (!isDragging) return;
+      isDragging = false;
+      swipeKnob.style.transition = 'transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28)';
+      swipeKnob.style.transform = `translateX(0px)`;
+    }
+
+    swipeKnob.addEventListener('mousedown', onDragStart);
+    window.addEventListener('mousemove', onDragMove);
+    window.addEventListener('mouseup', onDragEnd);
+    swipeKnob.addEventListener('touchstart', onDragStart, { passive: true });
+    window.addEventListener('touchmove', onDragMove, { passive: true });
+    window.addEventListener('touchend', onDragEnd);
+
+    function executeSwipePowerOff() {
+      AudioEngine.powerDown();
+      triggerConfetti();
+
+      sliderAcTemp.value = 28;
+      appState.acTemp = 28;
+      document.getElementById('labelAcTemp').innerText = `28.0°C (已斷電)`;
+      fanIcon.className = "w-6 h-6 text-slate-600";
+      fanSpeedStatus.innerText = "已遠端切斷冷氣電源";
+
+      appState.bobaCups += 25;
+      appState.savedMoney += 1250;
+      document.getElementById('statBobaCups').innerText = appState.bobaCups;
+      document.getElementById('statSavedMoney').innerText = `NT$ ${appState.savedMoney.toLocaleString()}`;
+      document.getElementById('headerBobaMini').innerText = `🥤 ${appState.bobaCups}杯`;
+
+      triggerToast('🔥 放學大斷電成功！', '手機一秒切斷教室待機電源！現賺 25 杯珍奶！🥤');
+    }
+
+    // 封印怪獸卡
+    function sealMonster(type) {
+      AudioEngine.success();
+      triggerConfetti();
+      let bonus = 10;
+      if (type === 'ac') bonus = 12;
+      if (type === 'pc') bonus = 8;
+      appState.bobaCups += bonus;
+      document.getElementById('statBobaCups').innerText = appState.bobaCups;
+      document.getElementById('headerBobaMini').innerText = `🥤 ${appState.bobaCups}杯`;
+      triggerToast('👾 成功封印吃電怪獸！', `AI 已遠端壓制偷跑電力，為體驗班賺取 +${bonus} 杯珍奶！`);
+    }
+
+    // 模擬推播警報
+    function triggerSimulatedAlert() {
+      AudioEngine.alert();
+      const banner = document.getElementById('schoolAlertBanner');
+      banner.classList.remove('-translate-y-64');
+      banner.classList.add('translate-y-0');
+    }
+
+    function dismissSchoolAlert() {
+      const banner = document.getElementById('schoolAlertBanner');
+      banner.classList.remove('translate-y-0');
+      banner.classList.add('-translate-y-64');
+    }
+
+    function emergencyRemoteShutdown() {
+      dismissSchoolAlert();
+      executeSwipePowerOff();
+    }
+
+    // 拍照抓怪
+    const photoTargets = {
+      ac: {
+        img: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=700&q=80",
+        box1: "🎯 抓到：冷氣設定 21°C (極度浪費！)",
+        box2: "⚡ 偷跑瓦數: 2,600W",
+        desc: "冷氣出風口紅外感溫顯示設定在 21°C，整間教室冷到發抖！AI 建議用手機遠端校正至 26°C，馬上多喝 12 杯大杯珍奶！"
+      },
+      meter: {
+        img: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=700&q=80",
+        box1: "🎯 電表指針需量: 198kW",
+        box2: "⚡ 尖峰警戒 (上限250kW)",
+        desc: "智慧電表 OCR 分析：即時需量即將逼近契約罰款紅線！AI 手機已制定削峰策略，為全校保住上萬元獎金！"
+      },
+      pc: {
+        img: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=700&q=80",
+        box1: "🎯 35 台電腦螢幕未睡眠",
+        box2: "⚡ 待機偷跑: 1,850W",
+        desc: "電腦教室下課沒人但主機風扇狂轉！AI 手機支援一鍵喚醒全校休眠模式，立刻省電 35%！"
+      },
+      board: {
+        img: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=700&q=80",
+        box1: "🎯 總箱溫度: 38.5°C 安全",
+        box2: "⚡ 走廊採光 100% 亮",
+        desc: "窗外陽光普照但走廊電燈全開！AI 建議將走廊調光至 40%，自然光就很舒服！"
+      }
+    };
+
+    function switchPhotoTarget(key) {
+      AudioEngine.shutter();
+      const data = photoTargets[key];
+      if (!data) return;
+
+      document.querySelectorAll('#btnTargetAc, #btnTargetMeter, #btnTargetPc, #btnTargetBoard').forEach(b => {
+        b.className = "p-2 rounded-xl bg-slate-850 border border-slate-700 text-slate-300 text-center";
+      });
+      const activeBtn = document.getElementById(`btnTarget${key.charAt(0).toUpperCase() + key.slice(1)}`);
+      if (activeBtn) {
+        activeBtn.className = "p-2 rounded-xl bg-slate-850 border-2 border-app-neon text-white text-center";
+      }
+
+      document.getElementById('cameraPreviewImg').src = data.img;
+      document.getElementById('aiBoundingBox1').innerText = data.box1;
+      document.getElementById('aiBoundingBox2').innerText = data.box2;
+      document.getElementById('cameraDiagnosisText').innerText = data.desc;
+    }
+
+    function applyPhotoCorrection() {
+      AudioEngine.shutter();
+      const flash = document.getElementById('flashOverlay');
+      flash.classList.add('flash-anim');
+      setTimeout(() => flash.classList.remove('flash-anim'), 350);
+
+      triggerConfetti();
+      AudioEngine.success();
+
+      appState.bobaCups += 12;
+      document.getElementById('statBobaCups').innerText = appState.bobaCups;
+      document.getElementById('headerBobaMini').innerText = `🥤 ${appState.bobaCups}杯`;
+      triggerToast('📸 AI 校正成功！', '吃電怪獸已被遠端收服！體驗班多賺到 12 杯大杯珍奶！🥤');
+    }
+
+    document.getElementById('realCameraInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        document.getElementById('cameraPreviewImg').src = ev.target.result;
+        document.getElementById('aiBoundingBox1').innerText = "🎯 現場自拍鏡頭辨識成功";
+        document.getElementById('aiBoundingBox2').innerText = "⚡ 發現偷耗電迴路";
+        document.getElementById('cameraDiagnosisText').innerText = "AI 柯南已讀懂現場照片！已遠端排程最佳節電頻率！";
+        AudioEngine.shutter();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // 任務領取
+    function claimQuestReward(xpVal, questTitle) {
+      AudioEngine.success();
+      triggerConfetti();
+      appState.xp += xpVal;
+      document.getElementById('statXpCount').innerText = appState.xp;
+      document.getElementById('headerXpMini').innerText = `${appState.xp} XP`;
+      triggerToast(`🏆 達成：${questTitle}`, `獲得 +${xpVal} XP！訪客隊長戰力再升級！`);
+    }
+
+    function sendTaunt() {
+      AudioEngine.success();
+      triggerToast('👍 喝采送出！', '全校同學收到訪客隊長的節能按讚！');
+    }
+
+    function sendRemoteWarning() {
+      AudioEngine.alert();
+      triggerToast('📢 遠端廣播送出！', '已向九年三班發送「冷氣不要開 19 度」友善提醒！');
+    }
+
+    function triggerToast(title, desc) {
+      const toast = document.getElementById('toastBox');
+      document.getElementById('toastTitle').innerText = title;
+      document.getElementById('toastDesc').innerText = desc;
+      toast.classList.remove('translate-y-32', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-32', 'opacity-0');
+      }, 2800);
+    }
+
+    // Chart.js 圖表初始化
+    function initCharts() {
+      const homeCtx = document.getElementById('homeLoadChart').getContext('2d');
+      new Chart(homeCtx, {
+        type: 'line',
+        data: {
+          labels: ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'],
+          datasets: [
+            {
+              label: '原始浪費',
+              data: [130, 210, 190, 235, 180, 110],
+              borderColor: '#3B82F6',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              fill: true,
+              tension: 0.35,
+              borderWidth: 2,
+              pointRadius: 2
+            },
+            {
+              label: '訪客節能後',
+              data: [115, 165, 140, 170, 130, 85],
+              borderColor: '#00F5A0',
+              backgroundColor: 'rgba(0, 245, 160, 0.15)',
+              fill: true,
+              borderDash: [4, 4],
+              tension: 0.35,
+              borderWidth: 2,
+              pointRadius: 2.5
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#64748B', font: { size: 9 } } },
+            y: { grid: { color: '#1E293B' }, ticks: { color: '#64748B', font: { size: 9 } } }
+          }
+        }
+      });
+
+      const pieCtx = document.getElementById('monsterPieChart').getContext('2d');
+      new Chart(pieCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['冷氣怪', '大黑板', '燈光怪', '飲水機'],
+          datasets: [{
+            data: [48, 22, 15, 15],
+            backgroundColor: ['#00D8F6', '#A855F7', '#00F5A0', '#FBBF24'],
+            borderWidth: 2,
+            borderColor: '#0F172A'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '70%',
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    // 時鐘更新
+    setInterval(() => {
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      document.getElementById('phoneClock').innerText = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    }, 1000);
+
+    // 啟動初始化
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      initCharts();
+    });
+  </script>
+
+<script>
+(() => {
+  const el = id => document.getElementById(id);
+  let stream, recorder, chunks = [], facing = 'environment', url, timer, started, busy = false;
+  const status = text => { el('recordStatus').textContent = text; };
+  // 可於正式上線時填入所有訪客共用的 HTTPS 影片網址。
+  const PUBLIC_VIDEO_URL = '';
+  const dbReady = new Promise((resolve, reject) => {
+    const req = indexedDB.open('greenfilm-video-studio', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('videos');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  async function stored(mode, value) {
+    const db = await dbReady;
+    return new Promise((resolve,reject) => {
+      const tx = db.transaction('videos', mode), store = tx.objectStore('videos');
+      let req = mode === 'readonly' ? store.get('featured') : value ? store.put(value,'featured') : store.delete('featured');
+      tx.oncomplete = () => resolve(req.result);
+      tx.onerror = tx.onabort = () => reject(tx.error);
+    });
+  }
+  function buttons() {
+    const recording = recorder && recorder.state !== 'inactive';
+    el('openLive').disabled = busy || !!stream;
+    el('switchLive').disabled = busy || !stream || recording;
+    el('startRecord').disabled = busy || !stream || recording || !window.MediaRecorder;
+    el('stopRecord').disabled = !recording;
+    el('closeLive').disabled = busy || !stream || recording;
+    el('recordAudio').disabled = busy || !!stream;
+  }
+  function show(blob) {
+    if(url) URL.revokeObjectURL(url);
+    url = URL.createObjectURL(blob);
+    el('featuredVideo').src = url; el('featuredVideo').hidden = false;
+    el('videoEmpty').hidden = true;
+    el('downloadVideo').href = url;
+    el('downloadVideo').download = '錄影影片.' + (blob.type.includes('mp4') ? 'mp4' : blob.type.includes('webm') ? 'webm' : 'video');
+    el('downloadVideo').hidden = false;
+  }
+  async function save(blob) {
+    show(blob);
+    try { await stored('readwrite', blob); status('影片已顯示並儲存在本機，可預覽或下載。'); }
+    catch { status('影片可預覽與下載，但本機儲存失敗，請先下載保留。'); }
+  }
+  function close() {
+    if(stream) stream.getTracks().forEach(t => t.stop());
+    stream = null; el('liveVideo').srcObject = null; el('liveVideo').hidden = true; buttons();
+  }
+  async function open() {
+    if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) { status('此環境無法開啟鏡頭，請用 HTTPS 網址並在 Chrome／Safari 開啟。'); return; }
+    busy = true; buttons();
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing}}, audio:el('recordAudio').checked});
+      el('liveVideo').srcObject = stream; el('liveVideo').hidden = false;
+      status(window.MediaRecorder ? '鏡頭已開啟，按「開始錄影」進行錄製。' : '此瀏覽器可預覽鏡頭，但不支援錄影。');
+    } catch(e) {
+      close();
+      status(({NotAllowedError:'相機或麥克風權限未允許，請調整瀏覽器權限後重試。',NotFoundError:'找不到可用的相機或麥克風，可取消錄製聲音後重試。',NotReadableError:'鏡頭可能被其他程式使用，請關閉後重試。'})[e.name] || '無法開啟鏡頭，請檢查裝置與瀏覽器設定。');
+    } finally { busy = false; buttons(); }
+  }
+  el('openLive').onclick = open;
+  el('closeLive').onclick = () => {close(); status('鏡頭已關閉。');};
+  el('switchLive').onclick = async () => {close(); facing = facing === 'environment' ? 'user' : 'environment'; await open();};
+  el('startRecord').onclick = () => {
+    try {
+      const type = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/mp4','video/webm'].find(t => MediaRecorder.isTypeSupported(t));
+      recorder = type ? new MediaRecorder(stream,{mimeType:type}) : new MediaRecorder(stream);
+      chunks = [];
+      recorder.ondataavailable = e => {if(e.data.size) chunks.push(e.data);};
+      recorder.onstop = async () => {
+        clearInterval(timer);
+        const blob = new Blob(chunks,{type:recorder.mimeType || chunks[0]?.type || 'video/webm'});
+        close(); buttons();
+        if(blob.size) await save(blob); else status('沒有錄到影片，請重新嘗試。');
+      };
+      recorder.onerror = () => {clearInterval(timer); status('錄影發生錯誤，請停止後重新嘗試。');};
+      recorder.start(1000); started = Date.now(); status('🔴 錄影中 00:00'); buttons();
+      timer = setInterval(() => {const sec=Math.floor((Date.now()-started)/1000); status('🔴 錄影中 '+String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0'));},1000);
+    } catch {status('此裝置無法使用目前的錄影格式，請換用其他瀏覽器。'); buttons();}
+  };
+  el('stopRecord').onclick = () => {if(recorder?.state === 'recording') {recorder.stop(); status('正在處理影片…');}};
+  el('videoFile').onchange = async e => {const file=e.target.files[0]; if(file) {if(file.type && !file.type.startsWith('video/')) return status('請選擇影片檔。'); await save(file);} e.target.value='';};
+  el('clearVideo').onclick = async () => {
+    el('featuredVideo').pause(); el('featuredVideo').removeAttribute('src'); el('featuredVideo').load(); el('featuredVideo').hidden=true;
+    el('videoEmpty').hidden=false; el('downloadVideo').hidden=true;
+    if(url) URL.revokeObjectURL(url); url=null;
+    try {await stored('readwrite',null); status('已移除本機影片。');} catch {status('無法清除本機儲存，請檢查瀏覽器設定。');}
+  };
+  el('featuredVideo').onerror = () => status('影片無法播放，請選擇此瀏覽器支援的 MP4 或 WebM 檔案。');
+  if(PUBLIC_VIDEO_URL) {el('featuredVideo').src=PUBLIC_VIDEO_URL; el('featuredVideo').hidden=false; el('videoEmpty').hidden=true;}
+  else stored('readonly').then(blob => {if(blob) show(blob);}).catch(() => status('本機儲存不可用，仍可錄影、預覽與下載。'));
+  window.addEventListener('pagehide', () => {if(recorder?.state === 'recording') recorder.stop(); close(); clearInterval(timer);});
+  buttons();
+})();
+</script>
+
+</body>
+</html>
